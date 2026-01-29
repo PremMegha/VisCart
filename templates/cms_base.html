@@ -1,0 +1,14 @@
+{% load cms_tags sekizai_tags static %}
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>{% page_attribute "page_title" %}</title>
+    {% render_block "css" %}
+  </head>
+  <body>
+    {% cms_toolbar %}
+    {% placeholder "content" %}
+    {% render_block "js" %}
+  </body>
+</html>
