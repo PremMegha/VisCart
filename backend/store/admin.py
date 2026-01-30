@@ -1,27 +1,27 @@
-# backend/store/admin.py
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 
+from viscart.admin_sites import tenant_admin_site
 from .models import Category, Product, Inventory, Order, OrderItem
 from .services import apply_order_inventory
 
 
-@admin.register(Category)
+@admin.register(Category, site=tenant_admin_site)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ("name", "slug")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
 
 
-@admin.register(Product)
+@admin.register(Product, site=tenant_admin_site)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ("name", "sku", "category", "price", "is_active")
     list_filter = ("is_active", "category")
     search_fields = ("name", "sku")
 
 
-@admin.register(Inventory)
+@admin.register(Inventory, site=tenant_admin_site)
 class InventoryAdmin(admin.ModelAdmin):
     list_display = ("product", "quantity", "updated_at")
     search_fields = ("product__name", "product__sku")
@@ -46,12 +46,8 @@ class OrderAdminForm(forms.ModelForm):
         cleaned = super().clean()
         status = cleaned.get("status")
 
-        # Only validate stock when trying to set PAID
         if status == Order.STATUS_PAID:
             order = self.instance
-
-            # Admin requires saving Order first before adding inlines,
-            # so in practice order.pk exists when items exist.
             if order.pk:
                 for item in order.items.select_related("product"):
                     inv = Inventory.objects.filter(product=item.product).first()
@@ -64,7 +60,7 @@ class OrderAdminForm(forms.ModelForm):
         return cleaned
 
 
-@admin.register(Order)
+@admin.register(Order, site=tenant_admin_site)
 class OrderAdmin(admin.ModelAdmin):
     form = OrderAdminForm
     list_display = (
@@ -90,5 +86,4 @@ class OrderAdmin(admin.ModelAdmin):
             try:
                 apply_order_inventory(obj)
             except ValidationError as e:
-                # Attach error to the form so admin shows it nicely
                 form.add_error(None, "; ".join(e.messages))
