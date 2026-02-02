@@ -1,6 +1,8 @@
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
+from integrations.telegram import send_telegram
+
 from .models import Inventory, Order
 
 
@@ -9,7 +11,7 @@ def apply_order_inventory(order: Order):
     if order.status != Order.STATUS_PAID:
         return
 
-    # Prevent double apply
+    # Prevent double apply (also prevents double telegram)
     if order.inventory_applied:
         return
 
@@ -37,3 +39,16 @@ def apply_order_inventory(order: Order):
         # Mark as applied
         order.inventory_applied = True
         order.save(update_fields=["inventory_applied"])
+
+        # Telegram notification (idempotent because inventory_applied blocks re-runs)
+        items_lines = []
+        for item in order.items.select_related("product"):
+            items_lines.append(f"• {item.product.sku} × {item.quantity}")
+
+        message = (
+            f"✅ <b>ORDER PAID</b>\n"
+            f"Order: <b>#{order.id}</b>\n"
+            f"Customer: {order.customer_name} ({order.customer_email})\n\n"
+            f"<b>Items</b>\n" + "\n".join(items_lines)
+        )
+        send_telegram(message)
