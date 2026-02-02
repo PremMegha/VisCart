@@ -26,6 +26,22 @@ class InventoryAdmin(admin.ModelAdmin):
     list_display = ("product", "quantity", "updated_at")
     search_fields = ("product__name", "product__sku")
 
+    def save_model(self, request, obj, form, change):
+        """
+        Manual inventory edits should also:
+        - reset low_stock_alerted when restocked above threshold
+        - trigger a low-stock alert if quantity crosses down to <= threshold
+        """
+        prev_qty = None
+        if obj.pk:
+            prev_qty = Inventory.objects.get(pk=obj.pk).quantity
+
+        super().save_model(request, obj, form, change)
+
+        # Reuse the same low-stock logic as the order flow
+        from .services import _maybe_handle_low_stock
+        _maybe_handle_low_stock(obj, previous_quantity=prev_qty)
+
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
